@@ -1,0 +1,349 @@
+---
+title: "github_p1"
+author: "Ahmed Abdou"
+date: "2023-04-24"
+output: html_document
+---
+
+
+
+Summary:
+Predicting the likelihood of death in heart failure patients based on demographic and clinical variables, and predict the length of hospital stay until death for heart failure patients based on the same variables.
+The data are from uc irvine machine learning repository(Heart failure clinical records Data Set).
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(survival)
+library(survminer)
+library(broom)
+library(Amelia)
+```
+
+reading the data:
+```{r}
+D <- read_csv("heart_failure_clinical_records_dataset.csv")
+```
+
+Displaying the data, and making a copy of the row data for future use
+```{r}
+head(D)
+data <- D
+
+```
+
+
+Check for missing values:
+
+```{r}
+missmap(D)
+```
+```{r}
+unique(D$sex)
+```
+
+Clean the data:
+
+Changing some variabbles to factors
+```{r}
+D <- D %>% mutate(sex = ifelse(sex==1,"Male","Female")) 
+D$sex <- factor(D$sex)
+
+D <- D %>% mutate(DEATH_EVENT = ifelse(DEATH_EVENT==1,"Death","No_Death")) 
+D$DEATH_EVENT <- factor(D$DEATH_EVENT)
+
+D <- D %>% mutate(anaemia  = ifelse(anaemia ==1,"Anaemia ","No_Anaemia ")) 
+D$anaemia  <- factor(D$anaemia )
+
+D <- D %>% mutate(diabetes  = ifelse(diabetes ==1,"Diabetes","No_Diabetes ")) 
+D$diabetes  <- factor(D$diabetes)
+```
+
+```{r}
+D <- D %>% mutate(smoking  = ifelse(smoking ==1,"Smoking","No_Smoking ")) 
+D$smoking  <- factor(D$smoking)
+
+D <- D %>% mutate(high_blood_pressure  = ifelse(high_blood_pressure ==1,"high_blood_pressure","No_high_blood_pressure ")) 
+D$high_blood_pressure  <- factor(D$high_blood_pressure)
+
+```
+
+
+Checking for any illogical values
+```{r}
+summary(D$age)
+
+summary(D$creatinine_phosphokinase)
+
+summary(D$ejection_fraction)
+
+summary(D$serum_sodium)
+
+summary(D$serum_sodium)
+
+```
+
+
+Viualization:
+
+CPK vs death
+```{r}
+ggplot(D,aes(x=DEATH_EVENT, y=creatinine_phosphokinase,color=sex)) +
+  geom_boxplot() +
+  labs(title = "Cp vs Death", 
+       y="Creatinine phosphokinase(mcg/L)" ,
+       x="Death") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The normal range of CPK for adult males would be 39 to 308 U/L, and for adult females it would be 26 to 192 U/L.
+I found online that males has a higher range than females, the graph supports that.
+
+
+EF vs death
+```{r}
+ggplot(D,aes(x=DEATH_EVENT, y=ejection_fraction)) +
+  geom_boxplot() +
+  labs(title = "Ejection Fraction vs Death", 
+       y="Ejection Fraction(%)" ,
+       x="Death") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+In general, there is no significant difference in ejection fraction (EF) between males and females, and the normal range is the same for both sexes. the graph supports that.
+
+
+Platelets vs death
+```{r}
+ggplot(D,aes(x=DEATH_EVENT, y=platelets)) +
+  geom_boxplot() +
+  labs(title = "platelets vs Death", 
+       y="platelets(µL)" ,
+       x="Death") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+In general, the normal range of platelet count is the same for both males and females, and there is no significant difference in the range between the two sexes. The normal range for platelet count for adults is typically between 150,000 and 450,000 platelets per microliter (µL) of blood, regardless of the individual's sex.
+
+
+
+Serum creatinine vs death
+```{r}
+ggplot(D,aes(x=DEATH_EVENT, y=serum_creatinine,color=sex)) +
+  geom_boxplot() +
+  labs(title = "Serum Creatinine vs Death", 
+       y="Serum Creatinine(mg/dL)" ,
+       x="Death") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+In general, the normal range of serum creatinine is slightly lower for females than for males, due to differences in muscle mass. The normal range for adult females is typically 0.5 to 1.1 milligrams per deciliter (mg/dL), while for adult males it is typically 0.6 to 1.2 mg/dL. However, it is important to note that the reference ranges can vary depending on the laboratory and the method used to measure serum creatinine.
+
+
+Serum Sodium vs death
+```{r}
+ggplot(D,aes(x=DEATH_EVENT, y=serum_sodium)) +
+  geom_boxplot() +
+  labs(title = "Serum Sodium vs Death", 
+       y="Serum Sodium(mEq/L)" ,
+       x="Death") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+In general, there is no significant difference in the normal range of serum sodium between males and females. The normal range for adults is typically between 135 and 145 milliequivalents per liter (mEq/L).
+
+
+
+Death vs age
+```{r}
+g1 <- ggplot(D,aes(x=DEATH_EVENT, y=age)) +
+  geom_boxplot() +
+  labs(title = "Age vs Death", 
+       x="Death",
+       y="Age") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Death vs time
+```{r}
+#g2 <- 
+  ggplot(D,aes(x=DEATH_EVENT, y=time)) +
+  geom_boxplot() +
+  labs(title = "Time vs Death", 
+       x="Death",
+       y="Time") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+ggplot(D,aes(x=DEATH_EVENT, y=time)) +
+  geom_col(position = "dodge") +
+  labs(title = "Time vs Death", 
+       x="Death",
+       y="Time") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+
+
+```{r}
+library(cowplot)
+plot_grid(g1,g2)
+```
+
+
+
+Sex vs death:
+```{r}
+ggplot(D,aes(x=DEATH_EVENT, fill=sex)) +
+  geom_bar(position = "dodge")+
+  labs(title = "Gender vs Death", 
+       x="Death") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+           Death   No_Death
+  Female    34       71
+  Male      62      132
+
+
+32.38% death in the Female group vs 31.19% in the male group No significant difference. However, this might change if we have more people in the female group.
+
+
+
+Death vs Smoking
+```{r}
+ggplot(D,aes(x=DEATH_EVENT, fill=smoking)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Smoking vs Death", 
+       x="Smoking") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+            Death No_Death
+  No_Smoking     66      137
+  Smoking        30       66
+
+32.51% (66/203) death in the no_smoking group vs 31.25% (30/96) in the smoking group, no significant difference. However, this might change if we have more people in the smoking group.
+
+
+
+
+Logistic Model for Death:
+```{r}
+model1.1 <- glm(DEATH_EVENT~., data=D, family = "binomial")
+summary(model1.1)
+```
+
+```{r}
+step(model1.1,trace=0)
+```
+
+```{r}
+model1.2 <- glm(formula = DEATH_EVENT ~ age + ejection_fraction + serum_creatinine + 
+    serum_sodium + time, family = "binomial", data = D)
+summary(model1.2)
+```
+
+```{r}
+model1.3 <- glm(formula = DEATH_EVENT ~ age + ejection_fraction + serum_creatinine + time, family = "binomial", data = D)
+summary(model1.3)
+```
+
+```{r}
+exp(coef(model1.3))
+```
+
+
+survival analysis:
+
+Full model:
+
+```{r}
+
+model2.1 <- coxph(Surv(time, DEATH_EVENT) ~ age + ejection_fraction + serum_creatinine + serum_sodium + anaemia + diabetes + high_blood_pressure + smoking + sex + platelets, data = data)
+
+summary(model2.1)
+
+```
+
+
+remove smoking
+```{r}
+model2.2 <- update(model2.1, .~.-smoking)
+summary(model2.2)
+```
+
+remove platelets:
+```{r}
+model2.3 <- update(model2.2, .~.-platelets)
+summary(model2.3)
+```
+
+remove sex
+```{r}
+model2.4 <- update(model2.3, .~.-sex)
+summary(model2.4)
+```
+
+Removing diabetes:
+```{r}
+model2.5 <- update(model2.4, .~.-diabetes)
+summary(model2.5)
+```
+
+Removing anaemia:
+
+```{r}
+model2.6 <- update(model2.5, .~.-anaemia)
+summary(model2.6)
+```
+Removing Serum SOduim:
+
+```{r}
+model2.7 <- update(model2.6, .~.-serum_sodium)
+summary(model2.7)
+```
+
+
+
+
+
+residuals vs Linear Predictions graph:
+```{r}
+ggcoxdiagnostics(model2.6) + geom_smooth(se = F)
+```
+
+
+creating a sample data frame :
+
+```{r}
+ages= c(40,80 )
+ejection_fractions = c(30,60) 
+serum_creatinines = c(1.2,1.8)
+high_blood_pressures = c(0, 1)
+
+new_data <- crossing(age=ages, ejection_fraction = ejection_fractions, serum_creatinine=serum_creatinines, high_blood_pressure=high_blood_pressures )
+new_data
+```
+
+
+```{r}
+s <- survfit(model2.7, newdata = new_data, data=data)
+summary(s)
+```
+
+Plotting Survival probability vs Time
+```{r}
+g<- ggsurvplot(s, conf.int = F,data=data)
+g
+
+```
+
